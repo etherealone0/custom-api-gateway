@@ -1,0 +1,59 @@
+server:
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 10s
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+routes:
+  - path: /api/orders
+    strip_prefix: true
+    strategy: round_robin
+    backends:
+      - url: http://localhost:9001
+        weight: 1
+      - url: http://localhost:9002
+        weight: 2
+
+  - path: /api/users
+    strip_prefix: true
+    strategy: least_conn
+    backends:
+      - url: http://localhost:9003
+        weight: 1
+
+health_check:
+  interval: 10s
+  timeout: 2s
+  path: /healthz
+
+rate_limit:
+  requests_per_second: 100
+  burst: 20
+
+auth:
+  jwt_secret: ${JWT_SECRET}
+
+cors:
+  allowed_origins:
+    - "*"
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+  allowed_headers:
+    - Authorization
+    - Content-Type
+
+circuit_breaker:
+  failure_threshold: 5
+  success_threshold: 2
+  timeout: 30s
+
+retry:
+  max_attempts: 3
+  base_delay: 100ms
+  max_delay: 2s
