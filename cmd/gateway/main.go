@@ -52,8 +52,15 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("starting gateway", "addr", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if cfg.Server.TLS.Enabled {
+			slog.Info("starting gateway with TLS", "addr", server.Addr)
+			err = server.ListenAndServeTLS(cfg.Server.TLS.CertFile, cfg.Server.TLS.KeyFile)
+		} else {
+			slog.Info("starting gateway", "addr", server.Addr)
+			err = server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
 			os.Exit(1)
 		}
