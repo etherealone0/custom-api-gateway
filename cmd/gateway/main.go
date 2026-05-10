@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Aditya03-D/custom-api-gateway/internal/config"
 	"github.com/Aditya03-D/custom-api-gateway/internal/middleware"
@@ -47,9 +51,28 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
-	slog.Info("starting gateway", "addr", server.Addr)
-	if err := server.ListenAndServe(); err != nil {
-		slog.Error("server error", "error", err)
+	go func() {
+		slog.Info("starting gateway", "addr", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Block until we receive SIGINT or SIGTERM 
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-quit
+	slog.Info("shutdown signal received", "signal", sig.String())
+
+	// Give in-flight requests 30 seconds to complete.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		slog.Error("forced shutdown", "error", err)
 		os.Exit(1)
 	}
+
+	slog.Info("gateway stopped gracefully")
 }
