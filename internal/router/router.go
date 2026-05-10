@@ -36,8 +36,6 @@ func New(cfgRoutes []config.RouteConfig) *Router {
 		}
 	}
 
-	// Sort by path length descending — longest prefix first.
-	// When Match() iterates in order, the first hit is the best match.
 	sort.Slice(routes, func(i, j int) bool {
 		return len(routes[i].Path) > len(routes[j].Path)
 	})
