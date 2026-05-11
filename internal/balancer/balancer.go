@@ -1,8 +1,10 @@
 package balancer
 
-import "github.com/Aditya03-D/custom-api-gateway/internal/config"
+import "errors"
+
+var ErrNoBackends = errors.New("no healthy backends available")
 
 // Balancer picks next healthy backend
 type Balancer interface {
-	NextServer() (*config.BackendConfig, error)
+	NextServer() (*Backend, error)
 }
