@@ -32,7 +32,7 @@ func main() {
 	}
 	slog.Info("config loaded", "port", cfg.Server.Port, "routes", len(cfg.Routes))
 
-	rt, err := router.New(cfg.Routes)
+	rt, err := router.New(cfg.Routes, nil)
 	if err != nil {
 		slog.Error("failed to build router", "error", err)
 		os.Exit(1)
@@ -71,7 +71,11 @@ func main() {
 	})
 
 	cfgWatcher, err := config.NewWatcher("config.yaml", func(newCfg *config.Config) {
-		newRouter, err := router.New(newCfg.Routes)
+		mu.RLock()
+		currentRouter := rt
+		mu.RUnlock()
+
+		newRouter, err := router.New(newCfg.Routes, currentRouter)
 		if err != nil {
 			slog.Error("failed to build router from reloaded config", "error", err)
 			return

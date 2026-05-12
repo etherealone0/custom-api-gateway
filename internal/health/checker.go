@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -73,6 +74,7 @@ func (c *Checker) check(ctx context.Context, b *balancer.Backend) {
 		return
 	}
 	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b.SetAlive(false)

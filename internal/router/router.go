@@ -21,7 +21,14 @@ type Router struct {
 	pools  []*balancer.ServerPool
 }
 
-func New(cfgRoutes []config.RouteConfig) (*Router, error) {
+func New(cfgRoutes []config.RouteConfig, oldRouter *Router) (*Router, error) {
+	oldBackends := make(map[string]*balancer.Backend)
+	if oldRouter != nil {
+		for _, b := range oldRouter.GetAllBackends() {
+			oldBackends[b.URL.String()] = b
+		}
+	}
+
 	routes := make([]Route, len(cfgRoutes))
 	pools := make([]*balancer.ServerPool, len(cfgRoutes))
 
@@ -33,6 +40,12 @@ func New(cfgRoutes []config.RouteConfig) (*Router, error) {
 
 		backends := make([]*balancer.Backend, len(cr.Backends))
 		for j, cb := range cr.Backends {
+			if existing, ok := oldBackends[cb.URL]; ok {
+				existing.Weight = cb.Weight // Update weight if it changed
+				backends[j] = existing
+				continue
+			}
+
 			b, err := balancer.NewBackend(cb.URL, cb.Weight)
 			if err != nil {
 				return nil, fmt.Errorf("route %s: invalid backend URL %q: %w", cr.Path, cb.URL, err)
