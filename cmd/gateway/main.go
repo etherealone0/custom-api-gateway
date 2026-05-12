@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -36,8 +37,14 @@ func main() {
 	}
 	rp := proxy.New(cfg.Server.WriteTimeout)
 
+	var mu sync.RWMutex
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		route := rt.Match(r)
+		mu.RLock()
+		currentRouter := rt
+		mu.RUnlock()
+
+		route := currentRouter.Match(r)
 		if route == nil {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
@@ -51,6 +58,25 @@ func main() {
 
 		rp.Forward(w, r, backend.URL.String())
 	})
+
+	cfgWatcher, err := config.NewWatcher("config.yaml", func(newCfg *config.Config) {
+		newRouter, err := router.New(newCfg.Routes)
+		if err != nil {
+			slog.Error("failed to build router from reloaded config", "error", err)
+			return
+		}
+
+		mu.Lock()
+		rt = newRouter
+		rp = proxy.New(newCfg.Server.WriteTimeout)
+		mu.Unlock()
+
+		slog.Info("router and proxy updated from reloaded config")
+	})
+	if err != nil {
+		slog.Error("failed to start config watcher", "error", err)
+		os.Exit(1)
+	}
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
@@ -74,13 +100,13 @@ func main() {
 		}
 	}()
 
-	// Block until we receive SIGINT or SIGTERM 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	slog.Info("shutdown signal received", "signal", sig.String())
 
-	// Give in-flight requests 30 seconds to complete.
+	cfgWatcher.Stop()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
