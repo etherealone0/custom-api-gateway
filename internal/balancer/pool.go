@@ -1,9 +1,11 @@
 package balancer
 
 import (
+	"log/slog"
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Backend struct {
@@ -64,4 +66,63 @@ func (sp *ServerPool) Len() int {
 	sp.mu.RLock()
 	defer sp.mu.RUnlock()
 	return len(sp.backends)
+}
+
+func (b *Backend) MarkDraining() {
+	b.alive.Store(false)
+}
+
+func (b *Backend) DrainConnections(timeout time.Duration) bool {
+	if b.ActiveConnections.Load() == 0 {
+		return true
+	}
+
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-deadline:
+			return false
+		case <-ticker.C:
+			if b.ActiveConnections.Load() == 0 {
+				return true
+			}
+		}
+	}
+}
+
+func FindRemovedBackends(old, current []*Backend) []*Backend {
+	currentURLs := make(map[string]bool)
+	for _, b := range current {
+		currentURLs[b.URL.String()] = true
+	}
+
+	var removed []*Backend
+	for _, b := range old {
+		if !currentURLs[b.URL.String()] {
+			removed = append(removed, b)
+		}
+	}
+	return removed
+}
+
+func DrainAll(backends []*Backend, timeout time.Duration) {
+	var wg sync.WaitGroup
+	for _, b := range backends {
+		wg.Add(1)
+		go func(b *Backend) {
+			defer wg.Done()
+			if b.DrainConnections(timeout) {
+				slog.Info("backend drained", "backend", b.URL.String())
+			} else {
+				slog.Warn("drain timeout, forcing removal",
+					"backend", b.URL.String(),
+					"remaining", b.ActiveConnections.Load(),
+				)
+			}
+		}(b)
+	}
+	wg.Wait()
 }

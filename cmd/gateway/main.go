@@ -77,12 +77,27 @@ func main() {
 			return
 		}
 
+		mu.RLock()
+		oldBackends := rt.GetAllBackends()
+		mu.RUnlock()
+		newBackends := newRouter.GetAllBackends()
+
+		removed := balancer.FindRemovedBackends(oldBackends, newBackends)
+		for _, b := range removed {
+			b.MarkDraining()
+		}
+
 		mu.Lock()
 		rt = newRouter
 		rp = proxy.New(newCfg.Server.WriteTimeout, newCfg.CircuitBreaker, newCfg.Retry)
 		mu.Unlock()
 
 		slog.Info("router and proxy updated from reloaded config")
+
+		if len(removed) > 0 {
+			slog.Info("draining removed backends", "count", len(removed))
+			go balancer.DrainAll(removed, 30*time.Second)
+		}
 	})
 	if err != nil {
 		slog.Error("failed to start config watcher", "error", err)
