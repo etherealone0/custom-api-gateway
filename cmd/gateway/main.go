@@ -37,7 +37,7 @@ func main() {
 		slog.Error("failed to build router", "error", err)
 		os.Exit(1)
 	}
-	rp := proxy.New(cfg.Server.WriteTimeout)
+	rp := proxy.New(cfg.Server.WriteTimeout, cfg.CircuitBreaker, cfg.Retry)
 
 	var mu sync.RWMutex
 
@@ -58,6 +58,7 @@ func main() {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.RLock()
 		currentRouter := rt
+		currentProxy := rp
 		mu.RUnlock()
 
 		route := currentRouter.Match(r)
@@ -66,13 +67,7 @@ func main() {
 			return
 		}
 
-		backend, err := route.Balancer.NextServer()
-		if err != nil {
-			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
-			return
-		}
-
-		rp.Forward(w, r, backend.URL.String())
+		currentProxy.Forward(w, r, route.Balancer)
 	})
 
 	cfgWatcher, err := config.NewWatcher("config.yaml", func(newCfg *config.Config) {
@@ -84,7 +79,7 @@ func main() {
 
 		mu.Lock()
 		rt = newRouter
-		rp = proxy.New(newCfg.Server.WriteTimeout)
+		rp = proxy.New(newCfg.Server.WriteTimeout, newCfg.CircuitBreaker, newCfg.Retry)
 		mu.Unlock()
 
 		slog.Info("router and proxy updated from reloaded config")
