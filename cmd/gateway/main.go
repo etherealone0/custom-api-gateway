@@ -29,7 +29,11 @@ func main() {
 	}
 	slog.Info("config loaded", "port", cfg.Server.Port, "routes", len(cfg.Routes))
 
-	rt := router.New(cfg.Routes)
+	rt, err := router.New(cfg.Routes)
+	if err != nil {
+		slog.Error("failed to build router", "error", err)
+		os.Exit(1)
+	}
 	rp := proxy.New(cfg.Server.WriteTimeout)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,9 +43,13 @@ func main() {
 			return
 		}
 
-		// No balancer yet
-		target := route.Backends[0].URL
-		rp.Forward(w, r, target)
+		backend, err := route.Balancer.NextServer()
+		if err != nil {
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		rp.Forward(w, r, backend.URL.String())
 	})
 
 	server := &http.Server{

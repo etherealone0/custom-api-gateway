@@ -1,25 +1,26 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
 
+	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
 	"github.com/Aditya03-D/custom-api-gateway/internal/config"
 )
 
 type Route struct {
 	Path        string
 	StripPrefix bool
-	Strategy    string
-	Backends    []config.BackendConfig
+	Balancer    balancer.Balancer
 }
 
 type Router struct {
 	routes []Route
 }
 
-func New(cfgRoutes []config.RouteConfig) *Router {
+func New(cfgRoutes []config.RouteConfig) (*Router, error) {
 	routes := make([]Route, len(cfgRoutes))
 
 	for i, cr := range cfgRoutes {
@@ -28,11 +29,26 @@ func New(cfgRoutes []config.RouteConfig) *Router {
 			path += "/"
 		}
 
+		backends := make([]*balancer.Backend, len(cr.Backends))
+		for j, cb := range cr.Backends {
+			b, err := balancer.NewBackend(cb.URL, cb.Weight)
+			if err != nil {
+				return nil, fmt.Errorf("route %s: invalid backend URL %q: %w", cr.Path, cb.URL, err)
+			}
+			backends[j] = b
+		}
+
+		pool := balancer.NewServerPool(backends)
+
+		bal, err := balancer.NewBalancer(cr.Strategy, pool)
+		if err != nil {
+			return nil, fmt.Errorf("route %s: %w", cr.Path, err)
+		}
+
 		routes[i] = Route{
 			Path:        path,
 			StripPrefix: cr.StripPrefix,
-			Strategy:    cr.Strategy,
-			Backends:    cr.Backends,
+			Balancer:    bal,
 		}
 	}
 
@@ -40,7 +56,7 @@ func New(cfgRoutes []config.RouteConfig) *Router {
 		return len(routes[i].Path) > len(routes[j].Path)
 	})
 
-	return &Router{routes: routes}
+	return &Router{routes: routes}, nil
 }
 
 func (rt *Router) Match(r *http.Request) *Route {
