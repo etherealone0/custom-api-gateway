@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
 	"github.com/Aditya03-D/custom-api-gateway/internal/config"
+	"github.com/Aditya03-D/custom-api-gateway/internal/health"
 	"github.com/Aditya03-D/custom-api-gateway/internal/middleware"
 	"github.com/Aditya03-D/custom-api-gateway/internal/proxy"
 	"github.com/Aditya03-D/custom-api-gateway/internal/router"
@@ -38,6 +40,20 @@ func main() {
 	rp := proxy.New(cfg.Server.WriteTimeout)
 
 	var mu sync.RWMutex
+
+	healthCtx, healthCancel := context.WithCancel(context.Background())
+	hc := health.New(
+		cfg.HealthCheck.Interval,
+		cfg.HealthCheck.Timeout,
+		cfg.HealthCheck.Path,
+		func() []*balancer.Backend {
+			mu.RLock()
+			currentRouter := rt
+			mu.RUnlock()
+			return currentRouter.GetAllBackends()
+		},
+	)
+	go hc.Start(healthCtx)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.RLock()
@@ -105,6 +121,7 @@ func main() {
 	sig := <-quit
 	slog.Info("shutdown signal received", "signal", sig.String())
 
+	healthCancel()
 	cfgWatcher.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

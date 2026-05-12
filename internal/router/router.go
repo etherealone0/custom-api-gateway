@@ -18,10 +18,12 @@ type Route struct {
 
 type Router struct {
 	routes []Route
+	pools  []*balancer.ServerPool
 }
 
 func New(cfgRoutes []config.RouteConfig) (*Router, error) {
 	routes := make([]Route, len(cfgRoutes))
+	pools := make([]*balancer.ServerPool, len(cfgRoutes))
 
 	for i, cr := range cfgRoutes {
 		path := cr.Path
@@ -39,6 +41,7 @@ func New(cfgRoutes []config.RouteConfig) (*Router, error) {
 		}
 
 		pool := balancer.NewServerPool(backends)
+		pools[i] = pool
 
 		bal, err := balancer.NewBalancer(cr.Strategy, pool)
 		if err != nil {
@@ -56,7 +59,7 @@ func New(cfgRoutes []config.RouteConfig) (*Router, error) {
 		return len(routes[i].Path) > len(routes[j].Path)
 	})
 
-	return &Router{routes: routes}, nil
+	return &Router{routes: routes, pools: pools}, nil
 }
 
 func (rt *Router) Match(r *http.Request) *Route {
@@ -80,4 +83,12 @@ func (rt *Router) Match(r *http.Request) *Route {
 	}
 
 	return nil
+}
+
+func (rt *Router) GetAllBackends() []*balancer.Backend {
+	var all []*balancer.Backend
+	for _, pool := range rt.pools {
+		all = append(all, pool.GetBackends()...)
+	}
+	return all
 }
