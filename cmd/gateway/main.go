@@ -55,7 +55,7 @@ func main() {
 	)
 	go hc.Start(healthCtx)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.RLock()
 		currentRouter := rt
 		currentProxy := rp
@@ -69,6 +69,23 @@ func main() {
 
 		currentProxy.Forward(w, r, route.Balancer)
 	})
+
+	rl := middleware.NewRateLimiter(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
+	corsHandler := middleware.NewCORS(cfg.CORS.AllowedOrigins, cfg.CORS.AllowedMethods, cfg.CORS.AllowedHeaders)
+	jwtAuth := middleware.JWTAuth(cfg.Auth.JWTSecret)
+
+	var apiHandler http.Handler = proxyHandler
+	apiHandler = rl.Middleware(apiHandler)
+	apiHandler = jwtAuth(apiHandler)
+	apiHandler = corsHandler.Middleware(apiHandler)
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", middleware.MetricsHandler())
+	mux.Handle("/", apiHandler)
+
+	var finalHandler http.Handler = mux
+	finalHandler = middleware.Metrics(finalHandler)
+	finalHandler = middleware.Logger(finalHandler)
 
 	cfgWatcher, err := config.NewWatcher("config.yaml", func(newCfg *config.Config) {
 		mu.RLock()
@@ -110,7 +127,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      middleware.Logger(handler),
+		Handler:      finalHandler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
