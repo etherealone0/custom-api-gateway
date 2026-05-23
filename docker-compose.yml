@@ -1,0 +1,55 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/config.yaml:ro
+    environment:
+      - JWT_SECRET=supersecret # Needed for config.yaml interpolation
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+    networks:
+      - gateway-net
+
+  backend1:
+    build:
+      context: ./testdata/echo-server
+      dockerfile: Dockerfile
+    container_name: backend1
+    environment:
+      - PORT=9000
+      - SERVER_ID=backend1
+    networks:
+      - gateway-net
+
+  backend2:
+    build:
+      context: ./testdata/echo-server
+      dockerfile: Dockerfile
+    container_name: backend2
+    environment:
+      - PORT=9000
+      - SERVER_ID=backend2
+    networks:
+      - gateway-net
+
+  backend3:
+    build:
+      context: ./testdata/echo-server
+      dockerfile: Dockerfile
+    container_name: backend3
+    environment:
+      - PORT=9000
+      - SERVER_ID=backend3
+    networks:
+      - gateway-net
+
+networks:
+  gateway-net:
+    driver: bridge
