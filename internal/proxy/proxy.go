@@ -13,6 +13,7 @@ import (
 
 	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
 	"github.com/Aditya03-D/custom-api-gateway/internal/config"
+	"github.com/Aditya03-D/custom-api-gateway/internal/middleware"
 	"github.com/Aditya03-D/custom-api-gateway/internal/resilience"
 )
 
@@ -117,6 +118,10 @@ func (rp *ReverseProxy) doProxy(r *http.Request, target *url.URL) (*http.Respons
 	outReq.URL.Host = target.Host
 	outReq.Host = target.Host
 	outReq.RequestURI = ""
+
+	if reqID, ok := r.Context().Value(middleware.RequestIDKey).(string); ok && reqID != "" {
+		outReq.Header.Set("X-Request-ID", reqID)
+	}
 
 	resp, err := rp.transport.RoundTrip(outReq)
 	if err != nil {

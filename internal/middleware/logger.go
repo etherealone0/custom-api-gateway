@@ -34,6 +34,7 @@ func Logger(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
 		r = r.WithContext(ctx)
+		r.Header.Set("X-Request-ID", requestID)
 
 		w.Header().Set("X-Request-ID", requestID)
 
