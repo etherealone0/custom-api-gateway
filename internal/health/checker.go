@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
+	"github.com/etherealone0/custom-api-gateway/internal/balancer"
 )
 
 type Checker struct {

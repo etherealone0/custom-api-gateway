@@ -4,7 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Aditya03-D/custom-api-gateway/internal/config"
+	"github.com/etherealone0/custom-api-gateway/internal/config"
 )
 
 func TestRouter_Match(t *testing.T) {

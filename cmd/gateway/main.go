@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
-	"github.com/Aditya03-D/custom-api-gateway/internal/config"
-	"github.com/Aditya03-D/custom-api-gateway/internal/health"
-	"github.com/Aditya03-D/custom-api-gateway/internal/middleware"
-	"github.com/Aditya03-D/custom-api-gateway/internal/proxy"
-	"github.com/Aditya03-D/custom-api-gateway/internal/router"
+	"github.com/etherealone0/custom-api-gateway/internal/balancer"
+	"github.com/etherealone0/custom-api-gateway/internal/config"
+	"github.com/etherealone0/custom-api-gateway/internal/health"
+	"github.com/etherealone0/custom-api-gateway/internal/middleware"
+	"github.com/etherealone0/custom-api-gateway/internal/proxy"
+	"github.com/etherealone0/custom-api-gateway/internal/router"
 )
 
 func main() {

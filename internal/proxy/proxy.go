@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Aditya03-D/custom-api-gateway/internal/balancer"
-	"github.com/Aditya03-D/custom-api-gateway/internal/config"
-	"github.com/Aditya03-D/custom-api-gateway/internal/middleware"
-	"github.com/Aditya03-D/custom-api-gateway/internal/resilience"
+	"github.com/etherealone0/custom-api-gateway/internal/balancer"
+	"github.com/etherealone0/custom-api-gateway/internal/config"
+	"github.com/etherealone0/custom-api-gateway/internal/middleware"
+	"github.com/etherealone0/custom-api-gateway/internal/resilience"
 )
 
 type ReverseProxy struct {

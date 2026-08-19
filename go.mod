@@ -1,4 +1,4 @@
-module github.com/Aditya03-D/custom-api-gateway
+module github.com/etherealone0/custom-api-gateway
 
 go 1.26.2
 
