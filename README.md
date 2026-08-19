@@ -125,6 +125,26 @@ The gateway was benchmarked using [k6](https://k6.io/) simulating 50 concurrent 
 
 *Note: The rate limiter accurately dropped 97% of this traffic with HTTP 429, allowing exactly 100 RPS through as configured. The gateway remained fully responsive.*
 
+## Chaos / Failure-Injection Demo
+
+The benchmark above proves the gateway is fast on the happy path. This demo proves the resilience machinery — retries, the per-backend circuit breaker, and the health checker — actually works under a real failure, not just in unit tests.
+
+`scripts/chaos-demo.sh` runs a sustained [k6](https://k6.io/) load against `/api/orders` (backed by `backend1` + `backend2`) and, partway through, kills `backend1` with `docker stop` and later brings it back with `docker start`. While that happens:
+
+- **Retries** mask individual failed attempts by re-picking a backend via the load balancer.
+- The **circuit breaker** for `backend1` trips open after `circuit_breaker.failure_threshold` consecutive failures, fast-fails for `circuit_breaker.timeout`, then probes half-open and closes again once `success_threshold` successes land.
+- The **health checker** independently notices `backend1` is down (and later back up) on its own `health_check.interval` poll and pulls it out of / back into rotation.
+
+A `prometheus` service (added to `docker-compose.yml`, scraping the gateway's `/metrics` every 2s) records `gateway_circuit_breaker_state`, `gateway_backend_health`, and `gateway_requests_total` for the whole run. After the load test finishes, a small Go tool (`tools/chaos-report`) queries Prometheus and renders the state transitions and request outcomes into `docs/chaos-demo-report.md`.
+
+Run it with:
+
+```bash
+make chaos-demo
+```
+
+Then inspect `docs/chaos-demo-report.md` for the generated timeline, or open http://localhost:9090 to graph `gateway_circuit_breaker_state{backend="http://backend1:9000"}` and `gateway_backend_health{backend="http://backend1:9000"}` directly. Tear the stack down afterward with `make docker-down`.
+
 ## Extending the Gateway
 
 ### Adding a New Balancer Strategy

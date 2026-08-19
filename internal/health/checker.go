@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/etherealone0/custom-api-gateway/internal/balancer"
+	"github.com/etherealone0/custom-api-gateway/internal/middleware"
 )
 
 type Checker struct {
@@ -68,6 +69,7 @@ func (c *Checker) check(ctx context.Context, b *balancer.Backend) {
 
 	if err != nil {
 		b.SetAlive(false)
+		middleware.BackendHealth.WithLabelValues(b.URL.String()).Set(0)
 		if wasAlive {
 			slog.Warn("backend went down", "url", b.URL.String(), "reason", err.Error())
 		}
@@ -78,6 +80,7 @@ func (c *Checker) check(ctx context.Context, b *balancer.Backend) {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b.SetAlive(false)
+		middleware.BackendHealth.WithLabelValues(b.URL.String()).Set(0)
 		if wasAlive {
 			slog.Warn("backend went down", "url", b.URL.String(), "status", resp.StatusCode)
 		}
@@ -85,6 +88,7 @@ func (c *Checker) check(ctx context.Context, b *balancer.Backend) {
 	}
 
 	b.SetAlive(true)
+	middleware.BackendHealth.WithLabelValues(b.URL.String()).Set(1)
 	if !wasAlive {
 		slog.Info("backend came up", "url", b.URL.String())
 	}

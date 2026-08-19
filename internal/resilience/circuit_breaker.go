@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/etherealone0/custom-api-gateway/internal/middleware"
 )
 
 var ErrCircuitOpen = errors.New("circuit breaker is open")
@@ -12,7 +14,7 @@ var ErrCircuitOpen = errors.New("circuit breaker is open")
 type State int
 
 const (
-	StateClosed   State = iota
+	StateClosed State = iota
 	StateOpen
 	StateHalfOpen
 )
@@ -112,12 +114,14 @@ func (cb *CircuitBreaker) toOpen() {
 	cb.state = StateOpen
 	cb.openedAt = time.Now()
 	cb.successCount = 0
+	middleware.CircuitBreakerState.WithLabelValues(cb.name).Set(float64(StateOpen))
 	slog.Warn("circuit breaker opened", "backend", cb.name, "failures", cb.failureCount)
 }
 
 func (cb *CircuitBreaker) toHalfOpen() {
 	cb.state = StateHalfOpen
 	cb.successCount = 0
+	middleware.CircuitBreakerState.WithLabelValues(cb.name).Set(float64(StateHalfOpen))
 	slog.Info("circuit breaker half-open", "backend", cb.name)
 }
 
@@ -125,5 +129,6 @@ func (cb *CircuitBreaker) toClosed() {
 	cb.state = StateClosed
 	cb.failureCount = 0
 	cb.successCount = 0
+	middleware.CircuitBreakerState.WithLabelValues(cb.name).Set(float64(StateClosed))
 	slog.Info("circuit breaker closed", "backend", cb.name)
 }

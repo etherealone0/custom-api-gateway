@@ -1,4 +1,4 @@
-.PHONY: all build test test-integration bench docker-build docker-up docker-down clean
+.PHONY: all build test test-integration bench docker-build docker-up docker-down chaos-demo clean
 
 BINARY_NAME=gateway
 DOCKER_IMAGE=custom-api-gateway:latest
@@ -33,6 +33,10 @@ docker-up:
 docker-down:
 	@echo "Tearing down Docker Compose environment..."
 	docker-compose down -v
+
+chaos-demo:
+	@echo "Running chaos/failure-injection demo (requires docker-compose and k6)..."
+	bash scripts/chaos-demo.sh
 
 clean:
 	@echo "Cleaning up..."
