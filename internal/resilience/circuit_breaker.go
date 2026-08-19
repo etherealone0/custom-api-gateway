@@ -45,6 +45,11 @@ type CircuitBreaker struct {
 }
 
 func NewCircuitBreaker(name string, failureThreshold, successThreshold int, timeout time.Duration) *CircuitBreaker {
+	// Export the closed baseline immediately so the gauge series exists in
+	// Prometheus from the start - otherwise the first sample ever scraped
+	// for this backend is whatever state it's in when it first fails, and
+	// the actual closed->open trip is invisible in the timeline.
+	middleware.CircuitBreakerState.WithLabelValues(name).Set(float64(StateClosed))
 	return &CircuitBreaker{
 		name:             name,
 		state:            StateClosed,

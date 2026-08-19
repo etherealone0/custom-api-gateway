@@ -66,6 +66,11 @@ func Metrics(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
+		// Capture before serving: routing may strip the path prefix on r.URL.Path
+		// in place, and metrics should reflect the path the client requested.
+		method := r.Method
+		path := r.URL.Path
+
 		rc := &responseCapture{ResponseWriter: w, statusCode: http.StatusOK}
 
 		next.ServeHTTP(rc, r)
@@ -73,8 +78,8 @@ func Metrics(next http.Handler) http.Handler {
 		duration := time.Since(start).Seconds()
 		status := strconv.Itoa(rc.statusCode)
 
-		RequestsTotal.WithLabelValues(r.Method, r.URL.Path, status).Inc()
-		RequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
+		RequestsTotal.WithLabelValues(method, path, status).Inc()
+		RequestDuration.WithLabelValues(method, path).Observe(duration)
 	})
 }
 
